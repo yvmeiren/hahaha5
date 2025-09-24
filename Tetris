@@ -1,0 +1,124 @@
+import pygame
+import random
+
+# 初始化
+pygame.init()
+SCREEN = pygame.display.set_mode((800, 600))
+clock = pygame.time.Clock()
+
+# 游戏常量
+CELL_SIZE = 30
+GRID_WIDTH = 10
+GRID_HEIGHT = 20
+GRID = [[0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
+
+# 方块形状（俄罗斯方块经典的7种形状）
+SHAPES = [
+    [[1, 1, 1, 1]],  # I
+    [[1, 1], [1, 1]],  # O
+    [[0, 1, 0], [1, 1, 1]],  # T
+    [[1, 1, 0], [0, 1, 1]],  # Z
+    [[0, 1, 1], [1, 1, 0]],  # S
+    [[1, 0, 0], [1, 1, 1]],  # L
+    [[0, 0, 1], [1, 1, 1]]   # J
+]
+
+# 当前方块控制
+class Tetromino:
+    def __init__(self):
+        self.shape_idx = random.randint(0, len(SHAPES)-1)
+        self.shape = SHAPES[self.shape_idx]
+        self.x = GRID_WIDTH // 2 - len(self.shape[0]) // 2
+        self.y = 0
+    
+    def rotate(self):
+        # 矩阵旋转 (90度)
+        rows = len(self.shape)
+        cols = len(self.shape[0])
+        rotated = [[0]*rows for _ in range(cols)]
+        for r in range(rows):
+            for c in range(cols):
+                rotated[c][rows-1-r] = self.shape[r][c]
+        
+        # 检查旋转后是否合法
+        old_shape = self.shape
+        self.shape = rotated
+        if self.collision():
+            self.shape = old_shape
+    
+    def collision(self, offset_x=0, offset_y=0):
+        for y, row in enumerate(self.shape):
+            for x, cell in enumerate(row):
+                if cell:
+                    pos_x, pos_y = self.x + x + offset_x, self.y + y + offset_y
+                    if not (0 <= pos_x < GRID_WIDTH and pos_y < GRID_HEIGHT):
+                        return True
+                    if pos_y >= 0 and GRID[pos_y][pos_x]:
+                        return True
+        return False
+    
+    def move(self, dx, dy):
+        if not self.collision(dx, dy):
+            self.x += dx
+            self.y += dy
+            return True
+        return False
+    
+    def lock(self):
+        for y, row in enumerate(self.shape):
+            for x, cell in enumerate(row):
+                if cell:
+                    if 0 <= self.y+y < GRID_HEIGHT and 0 <= self.x+x < GRID_WIDTH:
+                        GRID[self.y+y][self.x+x] = self.shape_idx+1
+
+# 消除完整行
+def clear_lines():
+    global GRID
+    lines_cleared = 0
+    for y in range(GRID_HEIGHT-1, -1, -1):
+        if all(GRID[y]):
+            del GRID[y]
+            GRID.insert(0, [0 for _ in range(GRID_WIDTH)])
+            lines_cleared += 1
+    return lines_cleared
+
+# 游戏主循环
+def main():
+    current_piece = Tetromino()
+    fall_time = 0
+    fall_speed = 500  # 下落时间(ms)
+    
+    while True:
+        # 处理事件
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT:
+                    current_piece.move(-1, 0)
+                elif event.key == pygame.K_RIGHT:
+                    current_piece.move(1, 0)
+                elif event.key == pygame.K_DOWN:
+                    current_piece.move(0, 1)
+                elif event.key == pygame.K_UP:
+                    current_piece.rotate()
+        
+        # 自动下落
+        fall_time += clock.get_rawtime()
+        if fall_time >= fall_speed:
+            fall_time = 0
+            if not current_piece.move(0, 1):
+                current_piece.lock()
+                clear_lines()
+                current_piece = Tetromino()
+                if current_piece.collision():
+                    print("Game Over!")
+                    return
+        
+        # 渲染...
+        # (此处省略渲染代码)
+        
+        clock.tick(60)
+
+if __name__ == "__main__":
+    main()
